@@ -3,6 +3,10 @@ import { useTable } from 'react-table';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+
+
+import logo from '../assets/logo.webp'
 
 const TableComponent = () => {
   const [data, setData] = useState(() => {
@@ -39,31 +43,107 @@ const TableComponent = () => {
   // Total de todas las personas
   const totalPersons = countMaxima + countPrimera + countSegunda + countTercera;
 
-  // Exportar a PDF
   const exportToPDF = () => {
     const doc = new jsPDF();
-    doc.text('Tabla Dinámica', 14, 10);
-    doc.autoTable({
-      head: [['MAXIMA', '1RA', '2DA', '3RA']],
-      body: data.map((row) => [row.maxima, row.primera, row.segunda, row.tercera]),
+    
+    const imgPath = logo; // Ruta de la imagen en tu proyecto
+    const img = new Image();
+    img.src = imgPath;
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const logoBase64 = canvas.toDataURL("image/png");
+  
+      // Obtener el ancho de la página y el ancho del logo
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const logoWidth = 50; // Ajusta el tamaño del logo
+      const xPosition = (pageWidth - logoWidth) / 2; // Centrado horizontalmente
+  
+      // Agregar el logo al PDF
+      doc.addImage(logoBase64, 'PNG', xPosition, 10, logoWidth, 30); // Cambia la posición y el tamaño
+  
+      // Agregar título de la tabla
+      doc.text('Tabla Dinámica', 14, 50);
+      
+      // Agregar la tabla
+      doc.autoTable({
+        head: [['MAXIMA', '1RA', '2DA', '3RA']],
+        body: data.map((row) => [row.maxima, row.primera, row.segunda, row.tercera]),
+        startY: 60, // Para evitar superposición con el logo
+      });
+  
+      // Agregar total
+      doc.text(`Total Personas: ${totalPersons}`, 14, doc.lastAutoTable.finalY + 10);
+      
+      doc.save('tabla-dinamica.pdf');
+    };
+  };
+  
+
+
+  const exportToExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Tabla Dinámica');
+  
+    // Agregar encabezados
+    worksheet.addRow(['MAXIMA', '1RA', '2DA', '3RA']);
+  
+    // Agregar datos
+    data.forEach(row => {
+      worksheet.addRow([row.maxima, row.primera, row.segunda, row.tercera]);
     });
-    doc.save('tabla-dinamica.pdf');
+  
+    // Agregar totales
+    worksheet.addRow(['Total Personas:', totalPersons]);
+  
+    // Cargar la imagen
+    const imgPath = logo // Ruta de tu logo
+    const img = await fetch(imgPath).then(res => res.blob());
+    const imageId = workbook.addImage({
+      buffer: await img.arrayBuffer(),
+      extension: 'png',
+    });
+  
+    // Insertar la imagen en la hoja de cálculo
+    worksheet.addImage(imageId, {
+      tl: { col: 10, row: 0 },
+      ext: { width: 100, height: 50 }, // Tamaño de la imagen
+    });
+  
+    // Guardar el archivo
+    workbook.xlsx.writeBuffer().then((buffer) => {
+      const blob = new Blob([buffer], { type: 'application/octet-stream' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tabla-dinamica.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
   };
-
-  // Exportar a Excel
-  const exportToExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tabla Dinámica');
-    XLSX.writeFile(workbook, 'tabla-dinamica.xlsx');
+  const handleDeleteRow = (index) => {
+    const newData = data.filter((_, i) => i !== index);
+    setData(newData);
   };
-
   const columns = React.useMemo(
     () => [
       { Header: 'MAXIMA', accessor: 'maxima', bgColor:'#fee440' },
       { Header: '1RA', accessor: 'primera' },
       { Header: '2DA', accessor: 'segunda' },
       { Header: '3RA', accessor: 'tercera' },
+      {
+        Header: 'Acciones',
+        accessor: 'actions',
+        Cell: ({ row }) => (
+          <button onClick={() => handleDeleteRow(row.index)} className="text-red-500">
+           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#e11d48" d="M7 21q-.825 0-1.412-.587T5 19V6H4V4h5V3h6v1h5v2h-1v13q0 .825-.587 1.413T17 21zm2-4h2V8H9zm4 0h2V8h-2z"/></svg>
+          </button>
+        ),
+      },
     ],
     []
   );
@@ -116,7 +196,7 @@ const TableComponent = () => {
              <tr {...headerGroup.getHeaderGroupProps()} key={headerGroup.id}>
              {headerGroup.headers.map((column, index) => {
                // Definir colores para cada columna (puedes personalizar estos colores)
-               const colors = ['bg-[#ffbd00]', 'bg-[#353535]', 'bg-[#0081a7]', 'bg-[#6b9080]'];
+               const colors = ['bg-[#ffbd00]', 'bg-[#353535]', 'bg-[#0081a7]', 'bg-[#6b9080]', 'bg-[#a4c3b2]'];
                
                return (
                  <th
