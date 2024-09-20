@@ -42,11 +42,84 @@ const TableComponent = () => {
   const totalPersons = countMaxima + countPrimera + countSegunda + countTercera;
 
   const exportToPDF = () => {
-    // ... Código para exportar a PDF ...
+    const doc = new jsPDF();
+    
+    const imgPath = logo; // Ruta de la imagen en tu proyecto
+    const img = new Image();
+    img.src = imgPath;
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const logoBase64 = canvas.toDataURL("image/png");
+  
+      // Obtener el ancho de la página y el ancho del logo
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const logoWidth = 50; // Ajusta el tamaño del logo
+      const xPosition = (pageWidth - logoWidth) / 2; // Centrado horizontalmente
+  
+      // Agregar el logo al PDF
+      doc.addImage(logoBase64, 'PNG', xPosition, 10, logoWidth, 30); // Cambia la posición y el tamaño
+  
+      // Agregar título de la tabla
+      doc.text('Tabla Categorias', 14, 50);
+      
+      // Agregar la tabla
+      doc.autoTable({
+        head: [['MAXIMA', '1RA', '2DA', '3RA']],
+        body: data.map((row) => [row.maxima, row.primera, row.segunda, row.tercera]),
+        startY: 60, // Para evitar superposición con el logo
+      });
+  
+      // Agregar total
+      doc.text(`Total Personas: ${totalPersons}`, 14, doc.lastAutoTable.finalY + 10);
+      
+      doc.save('tabla-dinamica.pdf');
+    };
   };
 
   const exportToExcel = async () => {
-    // ... Código para exportar a Excel ...
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Tabla Dinámica');
+  
+    // Agregar encabezados
+    worksheet.addRow(['MAXIMA', '1RA', '2DA', '3RA']);
+  
+    // Agregar datos
+    data.forEach(row => {
+      worksheet.addRow([row.maxima, row.primera, row.segunda, row.tercera]);
+    });
+  
+    // Agregar totales
+    worksheet.addRow(['Total Personas:', totalPersons]);
+  
+    // Cargar la imagen
+    const imgPath = logo // Ruta de tu logo
+    const img = await fetch(imgPath).then(res => res.blob());
+    const imageId = workbook.addImage({
+      buffer: await img.arrayBuffer(),
+      extension: 'png',
+    });
+  
+    // Insertar la imagen en la hoja de cálculo
+    worksheet.addImage(imageId, {
+      tl: { col: 10, row: 0 },
+      ext: { width: 100, height: 50 }, // Tamaño de la imagen
+    });
+  
+    // Guardar el archivo
+    workbook.xlsx.writeBuffer().then((buffer) => {
+      const blob = new Blob([buffer], { type: 'application/octet-stream' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tabla-dinamica.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
   };
 
   const handleDeleteField = (rowIndex, fieldName) => {
@@ -56,9 +129,9 @@ const TableComponent = () => {
       return newData;
     });
   };
-
-  const handleCellDoubleClick = (rowIndex, columnId, value) => {
+  const handleCellDoubleClick = (rowIndex, columnId) => {
     setEditingCell({ rowIndex, columnId });
+    const value = data[rowIndex][columnId] || ''; // Si está vacío, usa una cadena vacía
     setInputValue(value);
   };
 
@@ -88,7 +161,7 @@ const TableComponent = () => {
         accessor: 'maxima',
         Cell: ({ row }) => (
           <div
-            className="flex items-center justify-between"
+            className="flex items-center justify-between h-10"
             onDoubleClick={() => handleCellDoubleClick(row.index, 'maxima', row.values.maxima)}
           >
             {editingCell && editingCell.rowIndex === row.index && editingCell.columnId === 'maxima' ? (
@@ -115,14 +188,13 @@ const TableComponent = () => {
           </div>
         ),
       },
-      
       {
         Header: '1RA',
-        accessor: 'primera',  
+        accessor: 'primera',
         Cell: ({ row }) => (
           <div
-            className="flex items-center justify-between"
-            onDoubleClick={() => handleCellDoubleClick(row.index, 'primera', row.values.primera)}
+          className="flex items-center justify-between h-10"
+          onDoubleClick={() => handleCellDoubleClick(row.index, 'primera', row.values.primera)}
           >
             {editingCell && editingCell.rowIndex === row.index && editingCell.columnId === 'primera' ? (
               <input
@@ -153,8 +225,8 @@ const TableComponent = () => {
         accessor: 'segunda',
         Cell: ({ row }) => (
           <div
-            className="flex items-center justify-between"
-            onDoubleClick={() => handleCellDoubleClick(row.index, 'segunda', row.values.segunda)}
+          className="flex items-center justify-between h-10"
+          onDoubleClick={() => handleCellDoubleClick(row.index, 'segunda', row.values.segunda)}
           >
             {editingCell && editingCell.rowIndex === row.index && editingCell.columnId === 'segunda' ? (
               <input
@@ -185,8 +257,8 @@ const TableComponent = () => {
         accessor: 'tercera',
         Cell: ({ row }) => (
           <div
-            className="flex items-center justify-between"
-            onDoubleClick={() => handleCellDoubleClick(row.index, 'tercera', row.values.tercera)}
+          className="flex items-center justify-between h-10"
+          onDoubleClick={() => handleCellDoubleClick(row.index, 'tercera', row.values.tercera)}
           >
             {editingCell && editingCell.rowIndex === row.index && editingCell.columnId === 'tercera' ? (
               <input
@@ -211,7 +283,6 @@ const TableComponent = () => {
             )}
           </div>
         ),
-
       },
       {
         Header: 'Acciones',
@@ -334,10 +405,13 @@ const TableComponent = () => {
         <button onClick={exportToPDF} className="bg-red-600 text-white p-2 rounded flex items-center gap-4 font-bold">
           Descargar PDF
           {/* SVG del botón */}
+
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" color="#ffffff"><path d="M7 18v-2.5m0 0V14c0-.471 0-.707.154-.854C7.308 13 7.555 13 8.05 13h.7c.725 0 1.313.56 1.313 1.25S9.475 15.5 8.75 15.5zM21 13h-1.312c-.825 0-1.238 0-1.494.244s-.256.637-.256 1.423v.833m0 2.5v-2.5m0 0h2.187m-4.375 0c0 1.38-1.175 2.5-2.625 2.5c-.327 0-.49 0-.613-.067c-.291-.16-.262-.485-.262-.766v-3.334c0-.281-.03-.606.262-.766c.122-.067.286-.067.613-.067c1.45 0 2.625 1.12 2.625 2.5"/><path d="M15 22h-4.273c-3.26 0-4.892 0-6.024-.798a4.1 4.1 0 0 1-.855-.805C3 19.331 3 17.797 3 14.727v-2.545c0-2.963 0-4.445.469-5.628c.754-1.903 2.348-3.403 4.37-4.113C9.095 2 10.668 2 13.818 2c1.798 0 2.698 0 3.416.252c1.155.406 2.066 1.263 2.497 2.35C20 5.278 20 6.125 20 7.818V10"/><path d="M3 12a3.333 3.333 0 0 1 3.333-3.333c.666 0 1.451.116 2.098-.057A1.67 1.67 0 0 0 9.61 7.43c.173-.647.057-1.432.057-2.098A3.333 3.333 0 0 1 13 2"/></g></svg>
         </button>
         <button onClick={exportToExcel} className="bg-green-600 text-white font-bold p-2 rounded flex items-center gap-4">
           Descargar Excel
           {/* SVG del botón */}
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48"><g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-width="4"><path stroke-linejoin="round" d="M8 15V6a2 2 0 0 1 2-2h28a2 2 0 0 1 2 2v36a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-9"/><path d="M31 15h3m-6 8h6m-6 8h6"/><path stroke-linejoin="round" d="M4 15h18v18H4zm6 6l6 6m0-6l-6 6"/></g></svg>
         </button>
       </div>
     </div>
